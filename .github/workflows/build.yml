@@ -10,6 +10,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 自动创建 Release 需要 GITHUB_TOKEN 写入权限
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -68,14 +71,24 @@ jobs:
           path: app/build/outputs/apk/release/*-signed.apk
           if-no-files-found: error
 
-      # 打 tag（v*）时自动创建 GitHub Release 并附带签名 APK
+      # 构建成功后自动发布 GitHub Release：
+      #  - push main：自动生成 tag v1.<日期>.<序号>
+      #  - push v* tag：使用该 tag
+      #  - tag 已存在时回退为附加文件，保证幂等
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           APK=$(ls app/build/outputs/apk/release/*-signed.apk)
-          VERSION="${{ env.BUILD_DATE }}-r${{ github.run_number }}"
-          gh release create "${{ github.ref_name }}" "$APK" \
-            --title "WebDavMusicPlayer ${{ github.ref_name }} ($VERSION)" \
-            --notes "自动构建版本：versionName=1.$VERSION, versionCode=${{ github.run_number }}。使用 AOSP platform 签名。"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="v1.${BUILD_DATE}.${GITHUB_RUN_NUMBER}"
+          fi
+          VERSION="${BUILD_DATE}-r${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" "$APK" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "WebDavMusicPlayer $TAG ($VERSION)" \
+            --notes "自动构建版本：versionName=1.$VERSION, versionCode=$GITHUB_RUN_NUMBER。使用 AOSP platform 签名。" \
+          || gh release upload "$TAG" "$APK" --repo "$GITHUB_REPOSITORY" --clobber
