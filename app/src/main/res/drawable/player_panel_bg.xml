@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- 暗色播放面板背景：蓝→紫→红对角渐变（参考全屏播放器） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="@dimen/radius_lg" />
+    <gradient
+        android:type="linear"
+        android:angle="45"
+        android:startColor="#FF39479B"
+        android:centerColor="#FF7A4A7C"
+        android:endColor="#FFB04A38" />
+</shape>

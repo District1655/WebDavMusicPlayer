@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主色：深紫蓝 -->
+    <color name="brand_primary">#FF6C5CE7</color>
+    <color name="brand_primary_dark">#FF5848B5</color>
+    <color name="brand_accent">#FFA29BFE</color>
+
+    <!-- 背景 / 表面 -->
+    <color name="bg_window">#FFF6F6F8</color>
+    <color name="surface_card">#FFFFFFFF</color>
+    <color name="surface_player">#FFFFFFFF</color>
+
+    <!-- 文字 -->
+    <color name="text_primary">#FF1A1A1A</color>
+    <color name="text_secondary">#FF6E6E73</color>
+    <color name="text_hint">#FFAEAEB2</color>
+
+    <!-- 分隔 / 边框 -->
+    <color name="divider">#FFEDEDF0</color>
+    <color name="card_stroke">#FFE6E6EA</color>
+
+    <!-- 图标/播放状态 -->
+    <color name="icon_on_surface">#FF3A3A3C</color>
+    <color name="icon_active">#FF6C5CE7</color>
+
+    <!-- 进度条 -->
+    <color name="progress_track">#FFE0E0E5</color>
+
+    <!-- 暗色播放面板（参考全屏播放器风格） -->
+    <color name="player_text_dim">#99FFFFFF</color>
+    <color name="player_time">#B3FFFFFF</color>
+    <color name="player_btn_bg">#2EFFFFFF</color>
+    <color name="player_track">#40FFFFFF</color>
+</resources>

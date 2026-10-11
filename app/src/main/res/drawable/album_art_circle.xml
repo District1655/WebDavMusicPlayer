@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 竖屏播放页圆形封面占位（唱片） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:type="linear"
+        android:angle="315"
+        android:startColor="@color/brand_primary"
+        android:endColor="@color/brand_accent" />
+</shape>

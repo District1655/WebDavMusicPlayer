@@ -1,0 +1,52 @@
+<resources>
+
+    <!-- 主体主题：DayNight 深色模式自适应 -->
+    <style name="Theme.WebDavMusicPlayer" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="colorPrimaryDark">@color/brand_primary_dark</item>
+        <item name="colorAccent">@color/brand_accent</item>
+        <item name="android:windowBackground">@color/bg_window</item>
+        <item name="android:statusBarColor">@color/brand_primary_dark</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+    </style>
+
+    <!-- 卡片样式 -->
+    <style name="Widget.Card" parent="">
+        <item name="android:background">@drawable/card_bg</item>
+    </style>
+
+    <!-- 主按钮样式 -->
+    <style name="Widget.Button.Primary" parent="Widget.AppCompat.Button">
+        <item name="android:background">@drawable/btn_primary_bg</item>
+        <item name="android:textColor">#FFFFFFFF</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- 工具按钮（次要） -->
+    <style name="Widget.Button.Ghost" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:textColor">@color/brand_primary</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
+    <!-- 圆形播放按钮 -->
+    <style name="Widget.Button.Circle" parent="">
+        <item name="android:background">@drawable/btn_circle_bg</item>
+        <item name="android:textColor">#FFFFFFFF</item>
+        <item name="android:minWidth">56dp</item>
+        <item name="android:minHeight">56dp</item>
+    </style>
+
+    <!-- 暗色对话框 overlay：白字 + 白色强调（按钮/单选圈），配合主题渐变窗底 -->
+    <style name="ThemeOverlay.WebDavPlayer.Alert" parent="ThemeOverlay.AppCompat.Dialog.Alert">
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:textColorSecondary">@color/player_text_dim</item>
+        <item name="colorAccent">@android:color/white</item>
+        <item name="android:textColor">@android:color/white</item>
+        <!-- AlertDialog 单选列表项专用文字色属性 -->
+        <item name="android:textColorAlertDialogListItem">@android:color/white</item>
+    </style>
+</resources>

@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- 卡片背景：白色圆角 + 细边框，简洁质感 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <!-- 半透明白玻璃底：自定义背景图透出，素色背景上视觉不变 -->
+    <solid android:color="#D9FFFFFF" />
+    <stroke
+        android:width="1dp"
+        android:color="@color/card_stroke" />
+    <corners android:radius="14dp" />
+</shape>

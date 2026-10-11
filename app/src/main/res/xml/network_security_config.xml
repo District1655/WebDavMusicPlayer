@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  网络安全配置：
+  - cleartextTrafficPermitted="true"：兼容车机内网 WebDAV（HTTP）场景
+    若需更严格，可改为 false 并在 domain-config 中仅放行必要域名
+  - trust-anchors 仅信任系统 CA（不包含用户安装的证书，防中间人）
+  - 所有公网 API（QQ/酷狗/网易云/lrclib 等）均已使用 HTTPS
+  - 仅 mobilecdn.kugou.com 因不支持 HTTPS 保留 HTTP
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -1,0 +1,22 @@
+# 构建产物
+*.apk
+*.aab
+app/build/
+build/
+.gradle/
+
+# IDE
+.idea/
+*.iml
+local.properties
+
+# 日志与临时文件
+*.log
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 项目本地文件
+.trae/
+CODE_REVIEW_BACKUP.md
+build_log.txt

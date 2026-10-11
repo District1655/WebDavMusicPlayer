@@ -1,0 +1,103 @@
+<resources>
+    <string name="app_name">WebDav音乐</string>
+
+    <!-- 通用 -->
+    <string name="btn_save">保存</string>
+    <string name="btn_cancel">取消</string>
+    <string name="loading">加载中...</string>
+    <string name="unknown_track">未知曲目</string>
+    <string name="unknown_error">未知错误</string>
+    <string name="no_lyrics">暂无歌词</string>
+
+    <!-- 首页状态 -->
+    <string name="toast_cannot_back_home">无法返回桌面</string>
+    <string name="status_empty_library">曲库为空，点击「扫描」拉取音乐</string>
+    <string name="status_track_count">共 %1$d 首</string>
+    <string name="toast_service_not_ready">播放服务未就绪，请稍候再试</string>
+    <string name="status_service_starting">播放服务正在启动，请稍候</string>
+    <string name="status_selected">选中: %1$s</string>
+    <string name="now_playing_loading">%1$s  · 加载中...</string>
+    <string name="status_playing">播放：%1$s</string>
+
+    <!-- 扫描 -->
+    <string name="status_scanning">正在扫描 WebDAV...</string>
+    <string name="status_discovered">已发现 %1$d 首...</string>
+    <string name="status_scan_complete">扫描完成，共 %1$d 首</string>
+    <string name="status_scan_failed">扫描失败: %1$s</string>
+
+    <!-- 设置 -->
+    <string name="toast_bg_reset">已恢复默认背景</string>
+    <string name="cache_limit_gb">上限 %1$dGB</string>
+    <string name="cache_limit_mb">上限 %1$dMB</string>
+    <string name="cache_used">已用缓存：%1$.1f MB</string>
+    <string name="cache_used_empty">已用缓存：0.0 MB</string>
+    <string name="toast_cache_cleared">缓存已清空</string>
+    <string name="toast_fill_url_user">请填写地址和用户名</string>
+    <string name="toast_url_invalid">地址需以 http:// 或 https:// 开头</string>
+    <string name="btn_verifying">验证中...</string>
+    <string name="toast_connect_failed">连接失败：%1$s</string>
+    <string name="toast_saved_ok">已保存，连接验证通过</string>
+    <string name="status_settings_saved">设置已保存，点击「扫描」拉取音乐</string>
+
+    <!-- 播放器 -->
+    <string name="play_failed">播放失败：%1$s</string>
+
+    <!-- 收藏 -->
+    <string name="toast_favorited">已收藏 %1$s</string>
+    <string name="toast_unfavorited">已取消收藏</string>
+
+    <!-- 背景 -->
+    <string name="toast_bg_updated">背景已更新</string>
+    <string name="toast_bg_import_failed">背景导入失败</string>
+
+    <!-- 播放队列 -->
+    <string name="queue_playing_count">正在播放 %1$d</string>
+
+    <!-- 主题对话框 -->
+    <string name="dialog_title_theme">主题配色</string>
+
+    <!-- 主界面按钮 -->
+    <string name="btn_scan">扫描</string>
+    <string name="btn_home">主页</string>
+    <string name="btn_settings">设置</string>
+    <string name="not_playing">未播放</string>
+    <string name="time_zero">00:00</string>
+    <string name="time_empty">--:--</string>
+    <string name="queue_title">正在播放</string>
+
+    <!-- 设置对话框 -->
+    <string name="settings_title">WebDAV 设置</string>
+    <string name="settings_server_url">服务器地址</string>
+    <string name="settings_username">用户名</string>
+    <string name="settings_password">密码</string>
+    <string name="settings_trust_self_signed">信任自签 SSL 证书（不安全，仅用于内网自建服务）</string>
+    <string name="settings_auto_resume">打开应用自动续播（关闭则仅恢复位置，手动播放）</string>
+    <string name="settings_custom_bg">自定义背景图（全局适配）</string>
+    <string name="settings_pick_bg">选择背景图</string>
+    <string name="settings_reset_bg">恢复默认</string>
+    <string name="settings_cache">歌曲缓存（边听边存，改后下一首生效）</string>
+    <string name="settings_cache_enable">开启缓存</string>
+    <string name="settings_cache_size_default">上限 1GB</string>
+    <string name="settings_cache_used_default">已用缓存：0 MB</string>
+    <string name="settings_cache_clear">清空缓存</string>
+
+    <!-- 主题名称 -->
+    <string-array name="theme_names">
+        <item>星云紫</item>
+        <item>森林绿</item>
+        <item>网易红</item>
+        <item>深海蓝</item>
+        <item>落日橙</item>
+        <item>珍珠白</item>
+        <item>透明毛玻璃</item>
+        <item>雅致黑</item>
+    </string-array>
+
+    <!-- 播放模式名称 -->
+    <string-array name="play_mode_names">
+        <item>顺序播放</item>
+        <item>随机播放</item>
+        <item>单曲循环</item>
+        <item>列表循环</item>
+    </string-array>
+</resources>
