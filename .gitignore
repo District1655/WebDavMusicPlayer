@@ -18,5 +18,8 @@ captures/
 
 # 项目本地文件
 .trae/
+.vscode/
+CODE_REVIEW.md
+REFERENCE.md
 CODE_REVIEW_BACKUP.md
 build_log.txt

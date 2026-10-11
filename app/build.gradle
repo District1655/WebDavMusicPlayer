@@ -7,12 +7,21 @@ android {
     namespace 'com.webdav.music'
     compileSdk 34
 
+    // 版本号自动生成：
+    //  - CI（GitHub Actions）：versionCode = GITHUB_RUN_NUMBER（单调递增），
+    //    versionName = 1.<date>.<run_number>，如 1.20261011.42
+    //  - 本地构建回退：versionCode = 日期整数，versionName = 1.<date>.0
+    def ciRun = (System.getenv("GITHUB_RUN_NUMBER") ?: "0").toInteger()
+    def buildDate = System.getenv("BUILD_DATE") ?: new Date().format("yyyyMMdd")
+    def autoVersionCode = ciRun > 0 ? ciRun : buildDate.toInteger()
+    def autoVersionName = "1.${buildDate}.${ciRun > 0 ? ciRun : 0}"
+
     defaultConfig {
         applicationId "com.webdav.music"
         minSdk 29
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode autoVersionCode
+        versionName autoVersionName
     }
 
     buildTypes {
