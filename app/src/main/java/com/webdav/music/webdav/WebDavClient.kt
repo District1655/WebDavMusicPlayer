@@ -1,5 +1,7 @@
 package com.webdav.music.webdav
 
+import android.os.SystemClock
+import android.util.Log
 import okhttp3.Credentials
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -7,8 +9,9 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
-import java.io.StringReader
+import java.io.InputStream
 import java.net.URLDecoder
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.joinAll
@@ -25,6 +28,8 @@ class WebDavClient(
     private val trustSelfSigned: Boolean = false
 ) {
     companion object {
+        private const val TAG = "WebDavScan"
+
         /** 支持的音乐扩展名 */
         val MUSIC_EXTS = setOf("mp3", "flac", "m4a", "aac", "ogg", "wav", "wma")
         /** 扫描时额外收集的伴生文件（歌词） */
@@ -33,8 +38,12 @@ class WebDavClient(
 
     private val client: OkHttpClient = OkHttpHolder.forWebDav(trustSelfSigned)
 
-    /** PROPFIND 列目录，返回子项（不含目录自身） */
-    fun listDirectory(remotePath: String = "/", depth: String = "1"): List<WebDavEntry> {
+    /** PROPFIND 列目录，流式解析响应，返回符合条件的子项（不含目录自身） */
+    fun listDirectory(
+        remotePath: String = "/",
+        depth: String = "1",
+        include: (WebDavEntry) -> Boolean = { true }
+    ): List<WebDavEntry> {
         var url = baseUrl.trimEnd('/') + "/" + remotePath.trimStart('/').trimEnd('/')
         if (!url.endsWith("/")) url += "/"
 
@@ -60,8 +69,8 @@ class WebDavClient(
             if (resp.code != 207) {
                 throw RuntimeException("PROPFIND 失败: HTTP ${resp.code} ${resp.message}")
             }
-            val body = resp.body?.string() ?: throw RuntimeException("响应体为空")
-            return parseMultiStatus(body)
+            val body = resp.body ?: throw RuntimeException("响应体为空")
+            return body.byteStream().use { input -> parseMultiStatus(input, include) }
         }
     }
 
@@ -75,60 +84,86 @@ class WebDavClient(
         remotePath: String = "/",
         onProgress: ((count: Int) -> Unit)? = null
     ): List<WebDavEntry> = withContext(Dispatchers.IO) {
+        val startedAt = SystemClock.elapsedRealtime()
         fun extOf(e: WebDavEntry) = e.name.substringAfterLast('.', "").lowercase()
+        fun elapsedMs() = SystemClock.elapsedRealtime() - startedAt
 
-        // 方案1：Depth:infinity 一次拉全树（nginx 支持时最快）
+        // 方案1：Depth:infinity 一次拉全树，并在流式解析时直接过滤无关条目。
         try {
-            val entries = listDirectory(remotePath, depth = "infinity")
-            val files = entries.filter { !it.isDirectory && extOf(it) in SCAN_EXTS }
-            onProgress?.invoke(files.count { extOf(it) in MUSIC_EXTS })
+            val files = listDirectory(remotePath, depth = "infinity") {
+                !it.isDirectory && extOf(it) in SCAN_EXTS
+            }
+            val musicCount = files.count { extOf(it) in MUSIC_EXTS }
+            onProgress?.invoke(musicCount)
+            Log.d(TAG, "scan complete mode=infinity directories=1 entries=${files.size} " +
+                "music=$musicCount elapsedMs=${elapsedMs()}")
             return@withContext files
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            // infinity 不支持，走递归
+            // infinity 失败仅用于触发递归回退；回退后的任何目录失败都会终止扫描。
+            Log.w(TAG, "Depth infinity failed, fallback to recursive scan elapsedMs=${elapsedMs()}", e)
         }
 
-        // 方案2：并发递归扫描 fallback
+        // 方案2：并发递归扫描 fallback。任何目录失败均抛出，调用方不得用部分结果清库。
         val result = java.util.Collections.synchronizedList(mutableListOf<WebDavEntry>())
         val musicCount = java.util.concurrent.atomic.AtomicInteger(0)
+        val completedDirs = java.util.concurrent.atomic.AtomicInteger(0)
         val queue = java.util.concurrent.ConcurrentLinkedQueue<String>()
         queue.add(remotePath)
         val activeCount = java.util.concurrent.atomic.AtomicInteger(1)
 
-        val jobs = (1..8).map {
-            launch {
-                while (activeCount.get() > 0) {
-                    val dir = queue.poll()
-                    if (dir == null) {
-                        delay(50)
-                        continue
-                    }
-                    try {
-                        val entries = listDirectory(dir)
-                        var newDirs = 0
-                        for (e in entries) {
-                            if (e.isDirectory) {
-                                queue.add(e.href)
-                                newDirs++
-                            } else {
-                                val ext = extOf(e)
-                                if (ext in SCAN_EXTS) {
-                                    result.add(e)
-                                    if (ext in MUSIC_EXTS) {
-                                        onProgress?.invoke(musicCount.incrementAndGet())
+        try {
+            val jobs = (1..8).map {
+                launch {
+                    while (activeCount.get() > 0) {
+                        val dir = queue.poll()
+                        if (dir == null) {
+                            delay(50)
+                            continue
+                        }
+                        try {
+                            val entries = listDirectory(dir)
+                            for (e in entries) {
+                                if (e.isDirectory) {
+                                    // 先计数再入队，避免其他线程提前消费后把 activeCount 减到 0。
+                                    activeCount.incrementAndGet()
+                                    queue.add(e.href)
+                                } else {
+                                    val ext = extOf(e)
+                                    if (ext in SCAN_EXTS) {
+                                        result.add(e)
+                                        if (ext in MUSIC_EXTS) {
+                                            onProgress?.invoke(musicCount.incrementAndGet())
+                                        }
                                     }
                                 }
                             }
+                            completedDirs.incrementAndGet()
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            throw WebDavScanException(
+                                "目录扫描失败：$dir；已完成 ${completedDirs.get()} 个目录，" +
+                                    "已发现 ${musicCount.get()} 首", e
+                            )
+                        } finally {
+                            activeCount.decrementAndGet()
                         }
-                        activeCount.addAndGet(newDirs)
-                        activeCount.decrementAndGet()
-                    } catch (e: Exception) {
-                        activeCount.decrementAndGet()
                     }
                 }
             }
+            jobs.joinAll()
+        } catch (e: Exception) {
+            Log.e(TAG, "scan failed mode=recursive directories=${completedDirs.get()} " +
+                "music=${musicCount.get()} elapsedMs=${elapsedMs()}", e)
+            throw e
         }
-        jobs.joinAll()
-        result.toList()
+
+        // 所有 worker 已结束，不会再有写入，直接返回以避免再复制一份完整列表。
+        Log.d(TAG, "scan complete mode=recursive directories=${completedDirs.get()} " +
+            "entries=${result.size} music=${musicCount.get()} elapsedMs=${elapsedMs()}")
+        result
     }
 
     /** 下载文本文件（如 .lrc 歌词），失败返回 null */
@@ -147,12 +182,15 @@ class WebDavClient(
         }
     }
 
-    /** 解析 207 Multi-Status XML，跳过集合自身 */
-    private fun parseMultiStatus(xml: String): List<WebDavEntry> {
+    /** 流式解析 207 Multi-Status XML，跳过集合自身和无需保留的条目 */
+    private fun parseMultiStatus(
+        input: InputStream,
+        include: (WebDavEntry) -> Boolean
+    ): List<WebDavEntry> {
         val result = mutableListOf<WebDavEntry>()
         val factory = XmlPullParserFactory.newInstance()
         val parser = factory.newPullParser()
-        parser.setInput(StringReader(xml))
+        parser.setInput(input, null)
 
         var href: String? = null
         var isCollection = false
@@ -174,13 +212,14 @@ class WebDavClient(
                     if (localName(parser.name) == "response" && href != null) {
                         val isSelf = href == "/" || href.isNullOrEmpty()
                         if (!isSelf) {
-                            result.add(WebDavEntry(
+                            val entry = WebDavEntry(
                                 href = href!!,
                                 name = displayName?.takeIf { it.isNotEmpty() }
                                     ?: decodeHrefName(href!!),
                                 isDirectory = isCollection,
                                 size = size
-                            ))
+                            )
+                            if (include(entry)) result.add(entry)
                         }
                         href = null
                         isCollection = false
@@ -207,3 +246,6 @@ data class WebDavEntry(
     val isDirectory: Boolean,
     val size: Long
 )
+
+/** 扫描未完整完成；调用方必须保留原曲库，不得提交部分结果。 */
+class WebDavScanException(message: String, cause: Throwable) : RuntimeException(message, cause)

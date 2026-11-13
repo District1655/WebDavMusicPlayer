@@ -19,8 +19,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -41,6 +39,8 @@ import com.webdav.music.util.LyricUtils
 import com.webdav.music.webdav.OnlineMeta
 import com.webdav.music.webdav.WebDavClient
 import com.webdav.music.webdav.WebDavDataSourceFactory
+import com.webdav.music.webdav.WebDavScanException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -353,25 +353,12 @@ class MainActivity : AppCompatActivity() {
     private fun pushQueueToPlayer(tracks: List<Track>) {
         val c = controller ?: return
         if (tracks.isEmpty()) return
-        // 比较 mediaId 集合：数量相同但文件已替换（如删除 A 添加 B）也需更新
-        val currentIds = (0 until c.mediaItemCount).map { c.getMediaItemAt(it).mediaId }.toSet()
-        val newIds = tracks.map { it.path }.toSet()
-        if (currentIds == newIds) return
-        val base = WebDavPrefs.getUrl(this).trimEnd('/')
-        val items = tracks.map { t ->
-            MediaItem.Builder()
-                .setUri(Uri.parse(base + t.path))
-                .setMediaId(t.path)
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle(t.name)
-                        .setIsBrowsable(false)
-                        .setIsPlayable(true)
-                        .build()
-                )
-                .build()
+        // 逐项比较即可，避免为当前队列和新队列各创建一份完整 ID Set。
+        val unchanged = c.mediaItemCount == tracks.size && tracks.indices.all { index ->
+            c.getMediaItemAt(index).mediaId == tracks[index].path
         }
-        c.setMediaItems(items)
+        if (unchanged) return
+        PlaybackService.replaceQueue(c, tracks, WebDavPrefs.getUrl(this))
     }
 
     /** 点击列表项播放指定曲目 */
@@ -415,35 +402,58 @@ class MainActivity : AppCompatActivity() {
         tvStatus.text = getString(R.string.status_scanning)
 
         lifecycleScope.launch(Dispatchers.Main) {
+            val startedAt = android.os.SystemClock.elapsedRealtime()
+            fun elapsedMs() = android.os.SystemClock.elapsedRealtime() - startedAt
             try {
-                val entries = withContext(Dispatchers.IO) {
+                val storedCount = withContext(Dispatchers.IO) {
                     val dav = WebDavClient(url, user, pass, WebDavPrefs.isTrustSelfSigned(this@MainActivity))
-                    dav.scanMusic("/") { count ->
+                    val entries = dav.scanMusic("/") { count ->
                         runOnUiThread { tvStatus.text = getString(R.string.status_discovered, count) }
                     }
-                }
 
-                // 音频 + 同名 .lrc 歌词配对（按去扩展名的路径匹配）
-                val lrcMap = entries.filter {
-                    it.name.substringAfterLast('.', "").lowercase() == "lrc"
-                }.associate { e -> LyricUtils.lrcKey(e.href) to e.href }
-                val tracks = entries.filter {
-                    it.name.substringAfterLast('.', "").lowercase() in WebDavClient.MUSIC_EXTS
-                }.map {
-                    Track(path = it.href, name = it.name, size = it.size,
-                        lrcPath = lrcMap[LyricUtils.lrcKey(it.href)])
-                }
-                withContext(Dispatchers.IO) {
+                    // 单遍建立歌词索引，再单遍生成曲目，避免 filter/map 产生完整中间列表。
+                    val lrcMap = HashMap<String, String>()
+                    for (entry in entries) {
+                        if (entry.name.substringAfterLast('.', "").lowercase() == "lrc") {
+                            lrcMap[LyricUtils.lrcKey(entry.href)] = entry.href
+                        }
+                    }
+                    val tracks = ArrayList<Track>()
+                    for (entry in entries) {
+                        if (entry.name.substringAfterLast('.', "").lowercase() in WebDavClient.MUSIC_EXTS) {
+                            tracks.add(Track(
+                                path = entry.href,
+                                name = entry.name,
+                                size = entry.size,
+                                lrcPath = lrcMap[LyricUtils.lrcKey(entry.href)]
+                            ))
+                        }
+                    }
+
+                    // 只有完整扫描成功才会执行；返回前已核对提交后的实际去重条数。
                     store.replaceAll(tracks)
                 }
 
-                tvStatus.text = getString(R.string.status_scan_complete, tracks.size)
+                android.util.Log.d("WebDavScanFlow",
+                    "scan flow complete count=$storedCount elapsedMs=${elapsedMs()}")
+                tvStatus.text = getString(R.string.status_scan_complete, storedCount)
+                // entries/tracks 已随 IO 块离开作用域，不与重新查询的完整列表叠加存活。
                 loadCachedTracks()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: WebDavScanException) {
+                android.util.Log.e("WebDavScanFlow",
+                    "scan incomplete; previous library retained elapsedMs=${elapsedMs()}", e)
+                tvStatus.text = getString(
+                    R.string.status_scan_incomplete, e.message ?: getString(R.string.unknown_error))
             } catch (e: Exception) {
+                android.util.Log.e("WebDavScanFlow",
+                    "scan or persistence failed elapsedMs=${elapsedMs()}", e)
                 tvStatus.text = getString(R.string.status_scan_failed, e.message ?: "")
+            } finally {
+                btnScan.isEnabled = true
+                progressBar.visibility = View.GONE
             }
-            btnScan.isEnabled = true
-            progressBar.visibility = View.GONE
         }
     }
 

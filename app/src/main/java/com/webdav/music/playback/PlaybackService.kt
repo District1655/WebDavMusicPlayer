@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Player
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -13,6 +14,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.webdav.music.MainActivity
+import com.webdav.music.data.Track
 import com.webdav.music.data.TrackStore
 import com.webdav.music.data.WebDavPrefs
 import com.webdav.music.webdav.WebDavDataSourceFactory
@@ -49,7 +51,40 @@ class PlaybackService : MediaSessionService() {
     }
 
     companion object {
+        private const val QUEUE_CHUNK_SIZE = 200
+
         @Volatile private var instance: PlaybackService? = null
+
+        /** 分块构造播放队列，避免再创建一份完整的 MediaItem 列表。 */
+        fun replaceQueue(player: Player, tracks: List<Track>, baseUrl: String) {
+            val startedAt = android.os.SystemClock.elapsedRealtime()
+            if (tracks.isEmpty()) {
+                player.clearMediaItems()
+                return
+            }
+            val base = baseUrl.trimEnd('/')
+            var fromIndex = 0
+            while (fromIndex < tracks.size) {
+                val toIndex = minOf(fromIndex + QUEUE_CHUNK_SIZE, tracks.size)
+                val items = tracks.subList(fromIndex, toIndex).map { t ->
+                    MediaItem.Builder()
+                        .setUri(Uri.parse(base + t.path))
+                        .setMediaId(t.path)
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(t.name)
+                                .setIsBrowsable(false)
+                                .setIsPlayable(true)
+                                .build()
+                        )
+                        .build()
+                }
+                if (fromIndex == 0) player.setMediaItems(items) else player.addMediaItems(items)
+                fromIndex = toIndex
+            }
+            android.util.Log.d("WebDavMusic", "replaceQueue count=${tracks.size} " +
+                "chunkSize=$QUEUE_CHUNK_SIZE elapsedMs=${android.os.SystemClock.elapsedRealtime() - startedAt}")
+        }
 
         /** 设置页保存后调用：让缓存开关/上限立即生效（不打断当前播放） */
         fun onCacheConfigChanged() {
@@ -97,21 +132,7 @@ class PlaybackService : MediaSessionService() {
         // 启动时加载本地缓存作为初始播放队列（用户首次打开 APP 后即生效）
         val tracks = TrackStore(this).getAll()
         if (tracks.isNotEmpty()) {
-            val base = WebDavPrefs.getUrl(this).trimEnd('/')
-            val items = tracks.map { t ->
-                MediaItem.Builder()
-                    .setUri(Uri.parse(base + t.path))
-                    .setMediaId(t.path)
-                    .setMediaMetadata(
-                        MediaMetadata.Builder()
-                            .setTitle(t.name)
-                            .setIsBrowsable(false)
-                            .setIsPlayable(true)
-                            .build()
-                    )
-                    .build()
-            }
-            exo.setMediaItems(items)
+            replaceQueue(exo, tracks, WebDavPrefs.getUrl(this))
         }
 
         player = exo

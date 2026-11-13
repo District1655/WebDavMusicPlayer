@@ -3,7 +3,10 @@ package com.webdav.music.data
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteOpenHelper
+import android.os.SystemClock
+import android.util.Log
 
 /**
  * SQLite 本地缓存（替代 Room，绕开 JDK 24 注解处理兼容问题）
@@ -14,6 +17,7 @@ class TrackStore(context: Context) : SQLiteOpenHelper(
 ) {
 
     companion object {
+        private const val TAG = "TrackStore"
         private const val DB_NAME = "webdav_music.db"
         private const val DB_VERSION = 2
         private const val TABLE = "tracks"
@@ -47,6 +51,7 @@ class TrackStore(context: Context) : SQLiteOpenHelper(
 
     /** 查全部曲目，按名字排序 */
     fun getAll(): List<Track> {
+        val startedAt = SystemClock.elapsedRealtime()
         val result = mutableListOf<Track>()
         readableDatabase.rawQuery(
             "SELECT * FROM $TABLE ORDER BY name COLLATE NOCASE ASC", null
@@ -63,6 +68,7 @@ class TrackStore(context: Context) : SQLiteOpenHelper(
                 ))
             }
         }
+        Log.d(TAG, "getAll count=${result.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}")
         return result
     }
 
@@ -72,13 +78,15 @@ class TrackStore(context: Context) : SQLiteOpenHelper(
         }
     }
 
-    /** 全量刷新：清空后批量插入 */
-    fun replaceAll(tracks: List<Track>) {
+    /** 全量刷新：清空后逐行插入，提交后核对实际条数与预期去重数。 */
+    fun replaceAll(tracks: List<Track>): Int {
+        val startedAt = SystemClock.elapsedRealtime()
+        val expectedCount = tracks.mapTo(HashSet()) { it.path }.size
         val db = writableDatabase
         db.beginTransaction()
         try {
             db.delete(TABLE, null, null)
-            tracks.forEach { t ->
+            tracks.forEachIndexed { index, t ->
                 val cv = ContentValues().apply {
                     put("path", t.path)
                     put("name", t.name)
@@ -87,11 +95,24 @@ class TrackStore(context: Context) : SQLiteOpenHelper(
                     put("scannedAt", t.scannedAt)
                     if (t.lrcPath != null) put("lrcPath", t.lrcPath)
                 }
-                db.insertWithOnConflict(TABLE, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+                val rowId = db.insertWithOnConflict(
+                    TABLE, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+                if (rowId == -1L) throw SQLiteException("曲目写入失败，索引=$index")
             }
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
         }
+
+        val actualCount = count()
+        val elapsedMs = SystemClock.elapsedRealtime() - startedAt
+        if (actualCount != expectedCount) {
+            Log.e(TAG, "replaceAll validation failed input=${tracks.size} " +
+                "expected=$expectedCount actual=$actualCount elapsedMs=$elapsedMs")
+            throw IllegalStateException("曲库写入校验失败：预期 $expectedCount 首，实际 $actualCount 首")
+        }
+        Log.d(TAG, "replaceAll complete input=${tracks.size} expected=$expectedCount " +
+            "actual=$actualCount elapsedMs=$elapsedMs")
+        return actualCount
     }
 }

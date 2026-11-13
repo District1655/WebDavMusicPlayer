@@ -23,6 +23,7 @@
     <string name="status_scanning">正在扫描 WebDAV...</string>
     <string name="status_discovered">已发现 %1$d 首...</string>
     <string name="status_scan_complete">扫描完成，共 %1$d 首</string>
+    <string name="status_scan_incomplete">扫描不完整，已保留原曲库：%1$s</string>
     <string name="status_scan_failed">扫描失败: %1$s</string>
 
     <!-- 设置 -->
